@@ -25,6 +25,10 @@ jobs:
         pip install pytest pytest-mock
     
     - name: Run tests
+      env:
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ACCESS_KEY_ID: dummy
+        AWS_SECRET_ACCESS_KEY: dummy
       run: |
         python -m pytest tests/ -v
     
