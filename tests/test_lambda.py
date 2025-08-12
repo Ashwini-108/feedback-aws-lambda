@@ -4,10 +4,15 @@ from unittest.mock import patch, MagicMock
 import sys
 import os
 
+# Mock boto3 before importing lambda_function
+sys.modules['boto3'] = MagicMock()
+
 # Add the parent directory to sys.path to import lambda_function
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lambda_function import lambda_handler, get_feedback_handler
+# Mock the DynamoDB resource during import
+with patch('boto3.resource'):
+    from lambda_function import lambda_handler, get_feedback_handler
 
 
 class TestLambdaHandler:
