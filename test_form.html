@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Form - Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input[type="text"], 
+        input[type="email"], 
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        input[type="text"]:focus, 
+        input[type="email"]:focus, 
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .rating-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .rating-btn {
+            background: #f8f9fa;
+            border: 2px solid #e1e5e9;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .rating-btn:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+        
+        .rating-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .response {
+            margin-top: 1rem;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .response.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .response.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .api-url {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .api-url h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .api-url code {
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Feedback Form</h1>
+        
+        <form id="feedbackForm">
+            <div class="form-group">
+                <label for="name">Name *</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="message">Message *</label>
+                <textarea id="message" name="message" placeholder="Tell us about your experience..." required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Rating (optional)</label>
+                <div class="rating-group">
+                    <div class="rating-btn" data-rating="1">1 ⭐</div>
+                    <div class="rating-btn" data-rating="2">2 ⭐</div>
+                    <div class="rating-btn" data-rating="3">3 ⭐</div>
+                    <div class="rating-btn" data-rating="4">4 ⭐</div>
+                    <div class="rating-btn" data-rating="5">5 ⭐</div>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn">
+                <span class="btn-text">Submit Feedback</span>
+                <span class="loading" style="display: none;"></span>
+            </button>
+        </form>
+        
+        <div id="response" class="response"></div>
+        
+        <div class="api-url">
+            <h3>API Configuration</h3>
+            <p><strong>Endpoint:</strong> <code id="apiEndpoint">https://your-api-id.execute-api.us-east-1.amazonaws.com/prod/feedback</code></p>
+            <p><strong>Method:</strong> <code>POST</code></p>
+            <p><strong>Headers:</strong> <code>Content-Type: application/json</code></p>
+            <p><strong>Update the endpoint URL above with your actual API Gateway URL</strong></p>
+        </div>
+    </div>
+
+    <script>
+        let selectedRating = null;
+        
+        // Handle rating selection
+        document.querySelectorAll('.rating-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedRating = parseInt(this.dataset.rating);
+            });
+        });

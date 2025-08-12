@@ -1,0 +1,141 @@
+name: Deploy Feedback API
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-mock
+    
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Lint code
+      run: |
+        pip install flake8
+        flake8 lambda_function.py --max-line-length=100 --ignore=E501
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p deployment
+        cp lambda_function.py deployment/
+        cd deployment
+        pip install -r ../requirements.txt -t .
+        zip -r ../feedback-api.zip .
+    
+    - name: Deploy Lambda function
+      run: |
+        # Update Lambda function code
+        aws lambda update-function-code \
+          --function-name feedback-api \
+          --zip-file fileb://feedback-api.zip
+        
+        # Update function configuration if needed
+        aws lambda update-function-configuration \
+          --function-name feedback-api \
+          --runtime python3.9 \
+          --handler lambda_function.lambda_handler \
+          --timeout 30 \
+          --memory-size 128
+    
+    - name: Create API Gateway (if not exists)
+      run: |
+        # Check if API Gateway exists
+        API_ID=$(aws apigateway get-rest-apis --query 'items[?name==`feedback-api`].id' --output text)
+        
+        if [ -z "$API_ID" ] || [ "$API_ID" == "None" ]; then
+          echo "Creating new API Gateway..."
+          API_ID=$(aws apigateway create-rest-api \
+            --name feedback-api \
+            --description "Feedback API Gateway" \
+            --query 'id' --output text)
+        fi
+        
+        echo "API_ID=$API_ID" >> $GITHUB_ENV
+    
+    - name: Configure API Gateway
+      run: |
+        # Get root resource ID
+        ROOT_ID=$(aws apigateway get-resources \
+          --rest-api-id $API_ID \
+          --query 'items[?path==`/`].id' --output text)
+        
+        # Create /feedback resource if it doesn't exist
+        RESOURCE_ID=$(aws apigateway get-resources \
+          --rest-api-id $API_ID \
+          --query 'items[?pathPart==`feedback`].id' --output text)
+        
+        if [ -z "$RESOURCE_ID" ] || [ "$RESOURCE_ID" == "None" ]; then
+          RESOURCE_ID=$(aws apigateway create-resource \
+            --rest-api-id $API_ID \
+            --parent-id $ROOT_ID \
+            --path-part feedback \
+            --query 'id' --output text)
+        fi
+        
+        # Create POST method
+        aws apigateway put-method \
+          --rest-api-id $API_ID \
+          --resource-id $RESOURCE_ID \
+          --http-method POST \
+          --authorization-type NONE \
+          --no-api-key-required || true
+        
+        # Create OPTIONS method for CORS
+        aws apigateway put-method \
+          --rest-api-id $API_ID \
+          --resource-id $RESOURCE_ID \
+          --http-method OPTIONS \
+          --authorization-type NONE \
+          --no-api-key-required || true
+        
+        # Set up integration
+        LAMBDA_ARN="arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:feedback-api"
+        
+        aws apigateway put-integration \
+          --rest-api-id $API_ID \
+          --resource-id $RESOURCE_ID \
+          --http-method POST \
+          --type AWS_PROXY \
+          --integration-http-method POST \
+          --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/$LAMBDA_ARN/invocations" || true
+        
+        # Deploy API
+        aws apigateway create-deployment \
+          --rest-api-id $API_ID \
+          --stage-name prod
+        
+        echo "API Gateway URL: https://$API_ID.execute-api.us-east-1.amazonaws.com/prod/feedback"
