@@ -8,9 +8,13 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Initialize DynamoDB client
+# Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('FeedbackTable')
+sns = boto3.client('sns')
+
+# SNS Topic ARN (you'll need to replace this with your actual topic ARN)
+SNS_TOPIC_ARN = 'arn:aws:sns:us-east-1:692379310942:feedback-notifications'
 
 def lambda_handler(event, context):
     """
@@ -108,6 +112,30 @@ def lambda_handler(event, context):
         
         # Store in DynamoDB
         table.put_item(Item=feedback_data)
+        
+        # Send SNS notification
+        try:
+            rating_stars = '⭐' * (rating if rating else 0)
+            sns_message = f"""
+🎯 New Feedback Received!
+
+👤 Name: {feedback_data['name']}
+📧 Email: {feedback_data['email']}
+⭐ Rating: {rating_stars} ({rating}/5)
+💬 Message: {feedback_data['message']}
+🕒 Timestamp: {feedback_data['timestamp']}
+🆔 Feedback ID: {feedback_data['feedback_id']}
+            """.strip()
+            
+            sns.publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Subject=f"New Feedback: {rating_stars} from {feedback_data['name']}",
+                Message=sns_message
+            )
+            logger.info(f"SNS notification sent for feedback: {feedback_data['feedback_id']}")
+        except Exception as sns_error:
+            logger.error(f"Failed to send SNS notification: {str(sns_error)}")
+            # Don't fail the entire request if SNS fails
         
         # Log successful submission
         logger.info(f"Feedback submitted successfully: {feedback_data['feedback_id']}")
