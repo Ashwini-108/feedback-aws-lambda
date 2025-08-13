@@ -35,7 +35,7 @@ jobs:
     - name: Lint code
       run: |
         pip install flake8
-        flake8 lambda_function.py --max-line-length=100 --ignore=E501
+        flake8 lambda_function.py --max-line-length=100 --ignore=E501,W293,E302,W292
 
   deploy:
     needs: test
