@@ -67,7 +67,11 @@ jobs:
           --function-name feedback-api \
           --zip-file fileb://feedback-api.zip
         
-        # Update function configuration if needed
+        # Wait for the update to complete
+        aws lambda wait function-updated \
+          --function-name feedback-api
+        
+        # Update function configuration
         aws lambda update-function-configuration \
           --function-name feedback-api \
           --runtime python3.9 \
